@@ -15,16 +15,18 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TRINITYCORE_MOVEMENT_PACKETS_H
-#define TRINITYCORE_MOVEMENT_PACKETS_H
+#ifndef MovementPackets_h__
+#define MovementPackets_h__
 
 #include "Packet.h"
 #include "CombatLogPacketsCommon.h"
-#include "MovementInfo.h"
+#include "Object.h"
 #include "Optional.h"
 
 namespace Movement
 {
+    template<class index_type>
+    class Spline;
     class MoveSpline;
 }
 
@@ -41,7 +43,7 @@ namespace WorldPackets
         class ClientPlayerMovement final : public ClientPacket
         {
         public:
-            explicit ClientPlayerMovement(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
+            ClientPlayerMovement(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
 
             void Read() override;
 
@@ -51,7 +53,7 @@ namespace WorldPackets
         class TC_GAME_API MoveUpdate final : public ServerPacket
         {
         public:
-            explicit MoveUpdate() : ServerPacket(SMSG_MOVE_UPDATE) { }
+            MoveUpdate() : ServerPacket(SMSG_MOVE_UPDATE) { }
 
             WorldPacket const* Write() override;
 
@@ -90,13 +92,6 @@ namespace WorldPackets
             uint32 Duration = 0;
         };
 
-        struct MonsterSplineTurnData
-        {
-            float StartFacing = 0.0f;
-            float TotalTurnRads = 0.0f;
-            float RadsPerSec = 0.0f;
-        };
-
         struct MonsterSplineAnimTierTransition
         {
             int32 TierTransitionID = 0;
@@ -127,14 +122,13 @@ namespace WorldPackets
             std::vector<TaggedPosition<Position::XYZ>> Points;   // Spline path
             uint8 Mode                  = 0;    // Spline mode - actually always 0 in this packet - Catmullrom mode appears only in SMSG_UPDATE_OBJECT. In this packet it is determined by flags
             bool VehicleExitVoluntary   = false;
-            bool TaxiSmoothing          = false;
+            bool Interpolate            = false;
             ObjectGuid TransportGUID;
             int8 VehicleSeat            = -1;
             std::vector<TaggedPosition<Position::PackedXYZ>> PackedDeltas;
             Optional<MonsterSplineFilter> SplineFilter;
             Optional<MonsterSplineSpellEffectExtraData> SpellEffectExtraData;
             Optional<MonsterSplineJumpExtraData> JumpExtraData;
-            Optional<MonsterSplineTurnData> TurnData;
             Optional<MonsterSplineAnimTierTransition> AnimTierTransition;
             Optional<MonsterSplineUnknown901> Unknown901;
             float FaceDirection         = 0.0f;
@@ -146,8 +140,7 @@ namespace WorldPackets
         {
             uint32 ID = 0;
             bool CrzTeleport = false;
-            bool StopUseFaceDirection = false;
-            uint8 StopSplineStyle = 0;    // Determines how far from spline destination the mover is allowed to stop in place 0, 0, 3.0, 2.76, numeric_limits<float>::max, 1.1, float(INT_MAX); default before this field existed was distance 3.0 (index 2)
+            uint8 StopDistanceTolerance = 0;    // Determines how far from spline destination the mover is allowed to stop in place 0, 0, 3.0, 2.76, numeric_limits<float>::max, 1.1, float(INT_MAX); default before this field existed was distance 3.0 (index 2)
             MovementSpline Move;
         };
 
@@ -155,6 +148,7 @@ namespace WorldPackets
         {
         public:
             static void WriteCreateObjectSplineDataBlock(::Movement::MoveSpline const& moveSpline, ByteBuffer& data);
+            static void WriteCreateObjectAreaTriggerSpline(::Movement::Spline<int32> const& spline, ByteBuffer& data);
 
             static void WriteMovementForceWithDirection(MovementForce const& movementForce, ByteBuffer& data, Position const* objectPosition = nullptr);
         };
@@ -162,7 +156,7 @@ namespace WorldPackets
         class MonsterMove final : public ServerPacket
         {
         public:
-            explicit MonsterMove() : ServerPacket(SMSG_ON_MONSTER_MOVE) { }
+            MonsterMove() : ServerPacket(SMSG_ON_MONSTER_MOVE) { }
 
             void InitializeSplineData(::Movement::MoveSpline const& moveSpline);
 
@@ -176,7 +170,7 @@ namespace WorldPackets
         class FlightSplineSync final : public ServerPacket
         {
         public:
-            explicit FlightSplineSync() : ServerPacket(SMSG_FLIGHT_SPLINE_SYNC, 16 + 4) { }
+            FlightSplineSync() : ServerPacket(SMSG_FLIGHT_SPLINE_SYNC, 16 + 4) { }
 
             WorldPacket const* Write() override;
 
@@ -187,7 +181,7 @@ namespace WorldPackets
         class MoveSplineSetSpeed : public ServerPacket
         {
         public:
-            explicit MoveSplineSetSpeed(OpcodeServer opcode) : ServerPacket(opcode, 12) { }
+            MoveSplineSetSpeed(OpcodeServer opcode) : ServerPacket(opcode, 12) { }
 
             WorldPacket const* Write() override;
 
@@ -198,7 +192,7 @@ namespace WorldPackets
         class MoveSetSpeed : public ServerPacket
         {
         public:
-            explicit MoveSetSpeed(OpcodeServer opcode) : ServerPacket(opcode) { }
+            MoveSetSpeed(OpcodeServer opcode) : ServerPacket(opcode) { }
 
             WorldPacket const* Write() override;
 
@@ -210,7 +204,7 @@ namespace WorldPackets
         class MoveUpdateSpeed : public ServerPacket
         {
         public:
-            explicit MoveUpdateSpeed(OpcodeServer opcode) : ServerPacket(opcode) { }
+            MoveUpdateSpeed(OpcodeServer opcode) : ServerPacket(opcode) { }
 
             WorldPacket const* Write() override;
 
@@ -246,7 +240,7 @@ namespace WorldPackets
         class MoveSplineSetFlag final : public ServerPacket
         {
         public:
-            explicit MoveSplineSetFlag(OpcodeServer opcode) : ServerPacket(opcode, 8) { }
+            MoveSplineSetFlag(OpcodeServer opcode) : ServerPacket(opcode, 8) { }
 
             WorldPacket const* Write() override;
 
@@ -256,7 +250,7 @@ namespace WorldPackets
         class MoveSetFlag final : public ServerPacket
         {
         public:
-            explicit MoveSetFlag(OpcodeServer opcode) : ServerPacket(opcode, 12) { }
+            MoveSetFlag(OpcodeServer opcode) : ServerPacket(opcode, 12) { }
 
             WorldPacket const* Write() override;
 
@@ -273,7 +267,7 @@ namespace WorldPackets
         class TransferPending final : public ServerPacket
         {
         public:
-            explicit TransferPending() : ServerPacket(SMSG_TRANSFER_PENDING, 16) { }
+            TransferPending() : ServerPacket(SMSG_TRANSFER_PENDING, 16) { }
 
             WorldPacket const* Write() override;
 
@@ -281,13 +275,12 @@ namespace WorldPackets
             TaggedPosition<Position::XYZ> OldMapPosition;
             Optional<ShipTransferPending> Ship;
             Optional<int32> TransferSpellID;
-            Optional<int32> TaxiPathID;
         };
 
         class TransferAborted final : public ServerPacket
         {
         public:
-            explicit TransferAborted() : ServerPacket(SMSG_TRANSFER_ABORTED, 4 + 1 + 4 + 1) { }
+            TransferAborted() : ServerPacket(SMSG_TRANSFER_ABORTED, 4 + 1 + 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -300,14 +293,14 @@ namespace WorldPackets
         struct TeleportLocation
         {
             TaggedPosition<Position::XYZO> Pos;
-            int32 FloorDifficulty = -1;
-            int32 FloorIndex = -1;
+            int32 Unused901_1 = -1;
+            int32 Unused901_2 = -1;
         };
 
         class NewWorld final : public ServerPacket
         {
         public:
-            explicit NewWorld() : ServerPacket(SMSG_NEW_WORLD, 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4) { }
+            NewWorld() : ServerPacket(SMSG_NEW_WORLD, 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4) { }
 
             WorldPacket const* Write() override;
 
@@ -321,7 +314,7 @@ namespace WorldPackets
         class WorldPortResponse final : public ClientPacket
         {
         public:
-            explicit WorldPortResponse(WorldPacket&& packet) : ClientPacket(CMSG_WORLD_PORT_RESPONSE, std::move(packet)) { }
+            WorldPortResponse(WorldPacket&& packet) : ClientPacket(CMSG_WORLD_PORT_RESPONSE, std::move(packet)) { }
 
             void Read() override { }
         };
@@ -336,7 +329,7 @@ namespace WorldPackets
         class MoveTeleport final : public ServerPacket
         {
         public:
-            explicit MoveTeleport() : ServerPacket(SMSG_MOVE_TELEPORT, 12+4+16+16+4) { }
+            MoveTeleport() : ServerPacket(SMSG_MOVE_TELEPORT, 12+4+16+16+4) { }
 
             WorldPacket const* Write() override;
 
@@ -352,7 +345,7 @@ namespace WorldPackets
         class MoveUpdateTeleport final : public ServerPacket
         {
         public:
-            explicit MoveUpdateTeleport() : ServerPacket(SMSG_MOVE_UPDATE_TELEPORT) { }
+            MoveUpdateTeleport() : ServerPacket(SMSG_MOVE_UPDATE_TELEPORT) { }
 
             WorldPacket const* Write() override;
 
@@ -372,7 +365,7 @@ namespace WorldPackets
         class MoveApplyMovementForce final : public ServerPacket
         {
         public:
-            explicit MoveApplyMovementForce() : ServerPacket(SMSG_MOVE_APPLY_MOVEMENT_FORCE, 16 + 4 + 16 + 12 + 12 + 4 + 4 + 1) { }
+            MoveApplyMovementForce() : ServerPacket(SMSG_MOVE_APPLY_MOVEMENT_FORCE, 16 + 4 + 16 + 12 + 12 + 4 + 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -384,7 +377,7 @@ namespace WorldPackets
         class MoveApplyMovementForceAck final : public ClientPacket
         {
         public:
-            explicit MoveApplyMovementForceAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_APPLY_MOVEMENT_FORCE_ACK, std::move(packet)) { }
+            MoveApplyMovementForceAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_APPLY_MOVEMENT_FORCE_ACK, std::move(packet)) { }
 
             void Read() override;
 
@@ -395,7 +388,7 @@ namespace WorldPackets
         class MoveRemoveMovementForce final : public ServerPacket
         {
         public:
-            explicit MoveRemoveMovementForce() : ServerPacket(SMSG_MOVE_REMOVE_MOVEMENT_FORCE, 16 + 4 + 16) { }
+            MoveRemoveMovementForce() : ServerPacket(SMSG_MOVE_REMOVE_MOVEMENT_FORCE, 16 + 4 + 16) { }
 
             WorldPacket const* Write() override;
 
@@ -407,7 +400,7 @@ namespace WorldPackets
         class MoveRemoveMovementForceAck final : public ClientPacket
         {
         public:
-            explicit MoveRemoveMovementForceAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK, std::move(packet)) { }
+            MoveRemoveMovementForceAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK, std::move(packet)) { }
 
             void Read() override;
 
@@ -418,7 +411,7 @@ namespace WorldPackets
         class MoveUpdateApplyMovementForce final : public ServerPacket
         {
         public:
-            explicit MoveUpdateApplyMovementForce() : ServerPacket(SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE, sizeof(MovementInfo) + 16 + 12 + 12 + 4 + 4 + 1) { }
+            MoveUpdateApplyMovementForce() : ServerPacket(SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE, sizeof(MovementInfo) + 16 + 12 + 12 + 4 + 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -429,7 +422,7 @@ namespace WorldPackets
         class MoveUpdateRemoveMovementForce final : public ServerPacket
         {
         public:
-            explicit MoveUpdateRemoveMovementForce() : ServerPacket(SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE, sizeof(MovementInfo) + 16) { }
+            MoveUpdateRemoveMovementForce() : ServerPacket(SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE, sizeof(MovementInfo) + 16) { }
 
             WorldPacket const* Write() override;
 
@@ -440,7 +433,7 @@ namespace WorldPackets
         class MoveTeleportAck final : public ClientPacket
         {
         public:
-            explicit MoveTeleportAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_TELEPORT_ACK, std::move(packet)) { }
+            MoveTeleportAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_TELEPORT_ACK, std::move(packet)) { }
 
             void Read() override;
 
@@ -452,7 +445,7 @@ namespace WorldPackets
         class MovementAckMessage final : public ClientPacket
         {
         public:
-            explicit MovementAckMessage(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
+            MovementAckMessage(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
 
             void Read() override;
 
@@ -462,7 +455,7 @@ namespace WorldPackets
         class MovementSpeedAck final : public ClientPacket
         {
         public:
-            explicit MovementSpeedAck(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
+            MovementSpeedAck(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
 
             void Read() override;
 
@@ -473,7 +466,7 @@ namespace WorldPackets
         class MovementSpeedRangeAck final : public ClientPacket
         {
         public:
-            explicit MovementSpeedRangeAck(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
+            MovementSpeedRangeAck(WorldPacket&& packet) : ClientPacket(std::move(packet)) { }
 
             void Read() override;
 
@@ -485,7 +478,7 @@ namespace WorldPackets
         class SetActiveMover final : public ClientPacket
         {
         public:
-            explicit SetActiveMover(WorldPacket&& packet) : ClientPacket(CMSG_SET_ACTIVE_MOVER, std::move(packet)) { }
+            SetActiveMover(WorldPacket&& packet) : ClientPacket(CMSG_SET_ACTIVE_MOVER, std::move(packet)) { }
 
             void Read() override;
 
@@ -495,7 +488,7 @@ namespace WorldPackets
         class MoveSetActiveMover final : public ServerPacket
         {
         public:
-            explicit MoveSetActiveMover() : ServerPacket(SMSG_MOVE_SET_ACTIVE_MOVER, 8) { }
+            MoveSetActiveMover() : ServerPacket(SMSG_MOVE_SET_ACTIVE_MOVER, 8) { }
 
             WorldPacket const* Write() override;
 
@@ -511,7 +504,7 @@ namespace WorldPackets
         class MoveKnockBack final : public ServerPacket
         {
         public:
-            explicit MoveKnockBack() : ServerPacket(SMSG_MOVE_KNOCK_BACK, 16 + 8 + 4 + 4 + 4) { }
+            MoveKnockBack() : ServerPacket(SMSG_MOVE_KNOCK_BACK, 16 + 8 + 4 + 4 + 4) { }
 
             WorldPacket const* Write() override;
 
@@ -524,7 +517,7 @@ namespace WorldPackets
         class MoveUpdateKnockBack final : public ServerPacket
         {
         public:
-            explicit MoveUpdateKnockBack() : ServerPacket(SMSG_MOVE_UPDATE_KNOCK_BACK) { }
+            MoveUpdateKnockBack() : ServerPacket(SMSG_MOVE_UPDATE_KNOCK_BACK) { }
 
             WorldPacket const* Write() override;
 
@@ -534,7 +527,7 @@ namespace WorldPackets
         class MoveKnockBackAck final : public ClientPacket
         {
         public:
-            explicit MoveKnockBackAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_KNOCK_BACK_ACK, std::move(packet)) { }
+            MoveKnockBackAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_KNOCK_BACK_ACK, std::move(packet)) { }
 
             void Read() override;
 
@@ -552,7 +545,7 @@ namespace WorldPackets
         class MoveSetCollisionHeight final : public ServerPacket
         {
         public:
-            explicit MoveSetCollisionHeight() : ServerPacket(SMSG_MOVE_SET_COLLISION_HEIGHT, 4 + 16 + 4 + 1 + 4 + 4) { }
+            MoveSetCollisionHeight() : ServerPacket(SMSG_MOVE_SET_COLLISION_HEIGHT, 4 + 16 + 4 + 1 + 4 + 4) { }
 
             WorldPacket const* Write() override;
 
@@ -568,7 +561,7 @@ namespace WorldPackets
         class MoveUpdateCollisionHeight final : public ServerPacket
         {
         public:
-            explicit MoveUpdateCollisionHeight() : ServerPacket(SMSG_MOVE_UPDATE_COLLISION_HEIGHT) { }
+            MoveUpdateCollisionHeight() : ServerPacket(SMSG_MOVE_UPDATE_COLLISION_HEIGHT) { }
 
             WorldPacket const* Write() override;
 
@@ -580,7 +573,7 @@ namespace WorldPackets
         class MoveSetCollisionHeightAck final : public ClientPacket
         {
         public:
-            explicit MoveSetCollisionHeightAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_SET_COLLISION_HEIGHT_ACK, std::move(packet)) { }
+            MoveSetCollisionHeightAck(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_SET_COLLISION_HEIGHT_ACK, std::move(packet)) { }
 
             void Read() override;
 
@@ -593,7 +586,7 @@ namespace WorldPackets
         class MoveTimeSkipped final : public ClientPacket
         {
         public:
-            explicit MoveTimeSkipped(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_TIME_SKIPPED, std::move(packet)) { }
+            MoveTimeSkipped(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_TIME_SKIPPED, std::move(packet)) { }
 
             void Read() override;
 
@@ -604,7 +597,7 @@ namespace WorldPackets
         class MoveSkipTime final : public ServerPacket
         {
         public:
-            explicit MoveSkipTime() : ServerPacket(SMSG_MOVE_SKIP_TIME, 16 + 4) { }
+            MoveSkipTime() : ServerPacket(SMSG_MOVE_SKIP_TIME, 16 + 4) { }
 
             WorldPacket const* Write() override;
 
@@ -615,7 +608,7 @@ namespace WorldPackets
         class SummonResponse final : public ClientPacket
         {
         public:
-            explicit SummonResponse(WorldPacket&& packet) : ClientPacket(CMSG_SUMMON_RESPONSE, std::move(packet)) { }
+            SummonResponse(WorldPacket&& packet) : ClientPacket(CMSG_SUMMON_RESPONSE, std::move(packet)) { }
 
             void Read() override;
 
@@ -626,7 +619,7 @@ namespace WorldPackets
         class TC_GAME_API ControlUpdate final : public ServerPacket
         {
         public:
-            explicit ControlUpdate() : ServerPacket(SMSG_CONTROL_UPDATE, 16 + 1) { }
+            ControlUpdate() : ServerPacket(SMSG_CONTROL_UPDATE, 16 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -637,7 +630,7 @@ namespace WorldPackets
         class MoveSplineDone final : public ClientPacket
         {
         public:
-            explicit MoveSplineDone(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_SPLINE_DONE, std::move(packet)) { }
+            MoveSplineDone(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_SPLINE_DONE, std::move(packet)) { }
 
             void Read() override;
 
@@ -654,7 +647,7 @@ namespace WorldPackets
                 SCENARIO = 1
             };
 
-            explicit SummonRequest() : ServerPacket(SMSG_SUMMON_REQUEST, 16 + 4 + 4 + 1) { }
+            SummonRequest() : ServerPacket(SMSG_SUMMON_REQUEST, 16 + 4 + 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -668,7 +661,7 @@ namespace WorldPackets
         class SuspendToken final : public ServerPacket
         {
         public:
-            explicit SuspendToken() : ServerPacket(SMSG_SUSPEND_TOKEN, 4 + 1) { }
+            SuspendToken() : ServerPacket(SMSG_SUSPEND_TOKEN, 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -679,7 +672,7 @@ namespace WorldPackets
         class SuspendTokenResponse final : public ClientPacket
         {
         public:
-            explicit SuspendTokenResponse(WorldPacket&& packet) : ClientPacket(CMSG_SUSPEND_TOKEN_RESPONSE, std::move(packet)) { }
+            SuspendTokenResponse(WorldPacket&& packet) : ClientPacket(CMSG_SUSPEND_TOKEN_RESPONSE, std::move(packet)) { }
 
             void Read() override;
 
@@ -689,7 +682,7 @@ namespace WorldPackets
         class ResumeToken final : public ServerPacket
         {
         public:
-            explicit ResumeToken() : ServerPacket(SMSG_RESUME_TOKEN, 4 + 1) { }
+            ResumeToken() : ServerPacket(SMSG_RESUME_TOKEN, 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -697,48 +690,47 @@ namespace WorldPackets
             uint32 Reason = 1;
         };
 
-        struct CollisionHeightInfo
-        {
-            float Height = 0.0f;
-            float Scale = 0.0f;
-            UpdateCollisionHeightReason Reason = UpdateCollisionHeightReason::Scale;
-        };
-
-        struct StateChangeRangeInfo
-        {
-            float Min = 0.0f;
-            float Max = 0.0f;
-        };
-
-        struct KnockBackInfo
-        {
-            float HorzSpeed = 0.0f;
-            TaggedPosition<Position::XY> Direction;
-            float InitVertSpeed = 0.0f;
-        };
-
-        struct MoveStateChange
-        {
-            MoveStateChange(OpcodeServer messageId, uint32 sequenceIndex) : MessageID(messageId), SequenceIndex(sequenceIndex) { }
-
-            uint32 MessageID = 0;
-            uint32 SequenceIndex = 0;
-            Optional<float> Speed;
-            Optional<StateChangeRangeInfo> Range;
-            Optional<KnockBackInfo> KnockBack;
-            Optional<int32> VehicleRecID;
-            Optional<CollisionHeightInfo> CollisionHeight;
-            Optional<MovementForce> MovementForce_;
-            Optional<ObjectGuid> MovementForceGUID;
-            Optional<int32> MovementInertiaID;
-            Optional<uint32> MovementInertiaLifetimeMs;
-            Optional<int32> DriveCapabilityRecID;
-        };
-
         class MoveSetCompoundState final : public ServerPacket
         {
         public:
-            explicit MoveSetCompoundState() : ServerPacket(SMSG_MOVE_SET_COMPOUND_STATE, 4 + 1) { }
+            struct CollisionHeightInfo
+            {
+                float Height = 0.0f;
+                float Scale = 0.0f;
+                UpdateCollisionHeightReason Reason = UpdateCollisionHeightReason::Scale;
+            };
+
+            struct KnockBackInfo
+            {
+                float HorzSpeed = 0.0f;
+                TaggedPosition<Position::XY> Direction;
+                float InitVertSpeed = 0.0f;
+            };
+
+            struct SpeedRange
+            {
+                float Min = 0.0f;
+                float Max = 0.0f;
+            };
+
+            struct MoveStateChange
+            {
+                MoveStateChange(OpcodeServer messageId, uint32 sequenceIndex) : MessageID(messageId), SequenceIndex(sequenceIndex) { }
+
+                uint16 MessageID = 0;
+                uint32 SequenceIndex = 0;
+                Optional<float> Speed;
+                Optional<MoveSetCompoundState::SpeedRange> SpeedRange;
+                Optional<KnockBackInfo> KnockBack;
+                Optional<int32> VehicleRecID;
+                Optional<CollisionHeightInfo> CollisionHeight;
+                Optional<MovementForce> MovementForce_;
+                Optional<ObjectGuid> MovementForceGUID;
+                Optional<int32> MovementInertiaID;
+                Optional<uint32> MovementInertiaLifetimeMs;
+            };
+
+            MoveSetCompoundState() : ServerPacket(SMSG_MOVE_SET_COMPOUND_STATE, 4 + 1) { }
 
             WorldPacket const* Write() override;
 
@@ -749,19 +741,38 @@ namespace WorldPackets
         class MoveInitActiveMoverComplete final : public ClientPacket
         {
         public:
-            explicit MoveInitActiveMoverComplete(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE, std::move(packet)) { }
+            MoveInitActiveMoverComplete(WorldPacket&& packet) : ClientPacket(CMSG_MOVE_INIT_ACTIVE_MOVER_COMPLETE, std::move(packet)) { }
 
             void Read() override;
 
             uint32 Ticks = 0;
         };
 
-        ByteBuffer& operator>>(ByteBuffer& data, MovementAck& ack);
+        class MoveAddImpulse final : public ServerPacket
+        {
+        public:
+            MoveAddImpulse() : ServerPacket(SMSG_MOVE_ADD_IMPULSE, 4 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid MoverGUID;
+            uint32 SequenceIndex = 1;
+            TaggedPosition<Position::XYZ> Direction;
+        };
     }
+
+    ByteBuffer& operator<<(ByteBuffer& data, Movement::MonsterSplineFilterKey const& monsterSplineFilterKey);
+    ByteBuffer& operator<<(ByteBuffer& data, Movement::MonsterSplineFilter const& monsterSplineFilter);
+    ByteBuffer& operator<<(ByteBuffer& data, Movement::MovementSpline const& movementSpline);
+    ByteBuffer& operator<<(ByteBuffer& data, Movement::MovementMonsterSpline const& movementMonsterSpline);
 }
 
 ByteBuffer& operator>>(ByteBuffer& data, MovementInfo& movementInfo);
+ByteBuffer& operator<<(ByteBuffer& data, MovementInfo const& movementInfo);
 
+ByteBuffer& operator>>(ByteBuffer& data, MovementInfo::TransportInfo& transportInfo);
 ByteBuffer& operator<<(ByteBuffer& data, MovementInfo::TransportInfo const& transportInfo);
+ByteBuffer& operator>>(ByteBuffer& data, WorldPackets::Movement::MovementAck& movementAck);
+ByteBuffer& operator<<(ByteBuffer& data, MovementForce const& movementForce);
 
-#endif // TRINITYCORE_MOVEMENT_PACKETS_H
+#endif // MovementPackets_h__
